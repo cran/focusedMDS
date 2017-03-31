@@ -32,13 +32,19 @@ HTMLWidgets.widget({
 	  var buttonswidth = 140
 	  
 	  // Find the bigger, height or width, and set to size, to maintain aspect ratio
-	  var size = (width - buttonswidth) < height ? (width - buttonswidth) : height // FIXME figure out how to keep aspect ratio with button sidebar
+	  var size = (width - buttonswidth) < height ? (width - buttonswidth) : height 
 	  
     return {
 
 	  renderValue: function(data) {
 		  	 var legendboxsize = 20
-		  
+		  	 
+		  	 if(data.ids.length < 1000){
+		  	 	var opacityval = 0.1
+		  	 } else {
+		  	 	var opacityval = 0.01
+		  	 }
+			 
 			 focus_point = data.focus_point
 		     circles = data.circles
 			 
@@ -46,6 +52,11 @@ HTMLWidgets.widget({
 	 	  	 for(var i=0; i < data.colors.length; i++) {
 	 	  	 	 color_object[data.ids[i]] = data.colors[i]
 	 	  	 };
+			 
+			 var color_categories = {};
+			 for (var i=0; i < data.legend_data.categoryvector.length; i++) {
+			 	color_categories[data.ids[i]] = data.legend_data.categoryvector[i]
+			 }
 			 
 		     result = focused_mds(data.distances, data.ids, focus_point, data.tol, data.subsampling)
 			 
@@ -59,7 +70,7 @@ HTMLWidgets.widget({
 					 }
 				 }
 			 };
-		  
+		     console.log(maxDistance)
 			 // Create scaling factors
 			 scale = d3.scaleLinear()
 			          .domain([-1*maxDistance, maxDistance])
@@ -102,6 +113,17 @@ HTMLWidgets.widget({
 					 	.append('table')
 					 	.attr('width', buttonswidth + 'px')
 			 
+			 // If title given, create title tr
+			 if( data.title != "__notitle__") {
+			 	var title_tr = chart_inset.append('tr').append('td')
+				 		.append('text')
+				 		.text(data.title)
+			   	  	    .style('font-family', 'Georgia, serif')
+			    		.style('font-size', '12px')
+				 		.style('font-weight', 'bold')
+			 }		 
+			
+			 // Create label checkbox and legend 
 			 var labelcheck = chart_inset.append('tr').append('td')
 			 
 			 var button = labelcheck.append('input')
@@ -123,6 +145,7 @@ HTMLWidgets.widget({
 			   	  	 .style('font-family', 'Georgia, serif')
 			    	 .style('font-size', '12px')
 			 
+			 // Create slider and label
 			 var slider_text = chart_inset.append('tr').append('td')
 			 		 .append('text')
 			 		 .text('Circle size:')
@@ -187,8 +210,9 @@ HTMLWidgets.widget({
 				     .attr('r', 0.2 * size/20 * input/65 );
 				 
 				 sliderPosition = input;
-			 }	 
-			 
+			 }
+			 	 
+			 // Create spacer
 			 var spacer = chart_inset.append('tr').append('td')
 						.append('svg')
 				 		.attr('width', buttonswidth)
@@ -204,7 +228,12 @@ HTMLWidgets.widget({
 			 		.attr('height', (legendboxsize * data.legend_data.categories.length))
 			 			
 			 // Create color legend rectangles
-			 
+			 var dblclickpath = 0
+			 var clickpath = 0
+			 var clickvector = [];
+			 for( var i=0; i < data.legend_data.colors.length; i++) {
+			 	clickvector.push(0)
+			 }
 			 colorlegend.selectAll('rect')
 			 		.data(data.legend_data.colors)
 			 		.enter().append('rect')
@@ -214,7 +243,50 @@ HTMLWidgets.widget({
 			 			.attr('x', 10)
 			 			.attr('y', function(d,i) { return (i * legendboxsize); })
 						.attr('fill', function(d,i) { return d; })
-
+			 			.on('mouseover', function(d,i) {
+			 				if(clickpath == 0) {
+								d3.selectAll(".data_points")
+									.style('opacity', opacityval)
+								d3.selectAll(".X" + data.legend_data.categories[i])
+									.style('opacity', 1)
+			 				}
+			 			})
+						.on('mouseout', function(d) {
+							if(clickpath == 0) {
+								d3.selectAll('.data_points')
+									.style('opacity', 1)
+							} 
+						})
+						.on('click', function(d,i) {
+							if(clickvector[i] == 0 ) {
+								d3.selectAll(".X" + data.legend_data.categories[i])
+								   .style('opacity', 1)	
+								clickvector[i] = 1
+							} else if(clickvector[i] == 1) {
+								d3.selectAll(".X" + data.legend_data.categories[i])
+								   .style('opacity', opacityval)	
+								clickvector[i] = 0
+							}
+							d3.select('#infotext')
+								.style('visibility', 'visible')
+							d3.select('#infotext2')
+								.style('visibility', 'hidden')
+							clickpath = 1
+						})
+						.on('dblclick', function() {
+							d3.selectAll('.data_points')
+								.style('opacity', 1)
+							d3.select('#infotext')
+								.style('visibility', 'hidden')
+							d3.select('#infotext2')
+								.style('visibility', 'visible')
+							clickpath = 0
+							clickvector = [];
+			   			 	for( var i=0; i < data.legend_data.colors.length; i++) {
+			   			 		clickvector.push(0)
+			   			 	}
+						})
+			 	
 			 // Create color legend text
 			 colorlegend.selectAll('text')
 			 		.data(data.legend_data.categories)
@@ -232,6 +304,26 @@ HTMLWidgets.widget({
 				 	.style('visibility', 'hidden')
 			 }
 			 
+			 // Create infotext for exiting legend color stuff
+			 var infotext = chart_inset.append('tr').append('td')
+			 		.append('text')
+			 		.attr('id', 'infotext')
+			 		.text('Double click legend to exit')
+			  	    .style('font-family', 'Georgia, serif')
+			    	.style('font-size', '12px')
+			 		.style('opacity', 0.7)
+			 		.style('visibility', 'hidden')
+			 
+			 // Create infotext2 for general info
+			 var infotext2 = chart_inset.append('tr').append('td')
+			 		.append('text')
+			 		.attr('id', 'infotext2')
+			 		.text('Double click dot to re-focus plot. Click legend color block to highlight those data.')
+			  	    .style('font-family', 'Georgia, serif')
+			    	.style('font-size', '12px')
+			 		.style('opacity', 0.7)
+			 		.style('visibility', 'visible')
+			 
 			 // Create background bars
 			 g.selectAll("ellipse")
 			     .data(gridlines_rs)
@@ -248,7 +340,7 @@ HTMLWidgets.widget({
 			 g.selectAll("circle")
 			     .data(data.ids)
 			     .enter().append("circle")
-					   .attr("class", "data_points")
+					   .attr("class", function(d,i) { return "data_points " + "X"+color_categories[d]; })
 			 		   .attr("cx", function(d,i) { return scale(result[d]['x']); })
 			 		   .attr("cy", function(d,i) { return scale(result[d]['y']); })
 			 		   .attr("r", 0.2 * size/20)
@@ -285,7 +377,7 @@ HTMLWidgets.widget({
 			 					   var rTween = d3.scaleLinear().range( [old_result[d].r, result[d].r] )
 			 					   return function(t) { return scale( rTween(t) * sin( phiTween(t) ) )}
 			 				   })
-			 				   .attr("fill", function(d,i) { return color_object[d]})
+			 				   .attr("fill", function(d,i) { return color_object[d]; })
 			 			   	   .attr("stroke", function(d,i) { if(Object.keys(result).indexOf(d) == 0) { return "red"}})
 	   
 			 			   // update text locations

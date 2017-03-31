@@ -51,6 +51,11 @@
 #'   100 points, each point iteratively plotted after the 100th point will 
 #'   be optimized to a subsample of the previously plotted data points.
 #'   Recommended for plotting data sets with more than 300 points.
+#' @param title Optional title for plot, must be a single character string.
+#'
+#'
+#'
+#'
 #' 
 #' @examples
 #' # See http://lea-urpa.github.io/focusedMDS.html for 
@@ -93,7 +98,7 @@
 
 focusedMDS <- function(distances, ids = NULL, color_cat = NULL, focus_point = ids[1],
 	                   size = NULL, circles = 7, tol = 0.001, check_matrix = FALSE,
-					   subsampling = FALSE, color_palette = NULL )  {
+					   subsampling = FALSE, color_palette = NULL, title = NULL )  {
   
   # Define function that converts hex/named colors to rgb
   toRGBvector <- function(colorsvector) {
@@ -121,9 +126,13 @@ focusedMDS <- function(distances, ids = NULL, color_cat = NULL, focus_point = id
 	stop( "'distances' must be a square matrix or 'dist' object.")
   
   # Check that the matrix is symmetric
-  
   if( is.element(FALSE, distances == t(distances)) ){
 	  stop("Matrix does not appear to be symmetric. Are you sure it's a distance matrix? Try submitting a dist object.")
+  }
+  
+  # Check that the matrix contains no negative values
+  if( any( distances < 0) == TRUE){
+	  stop("Matrix must contain only positive values.")
   }
   
   # Check that the matrix fulfills the triangle inequality.
@@ -151,6 +160,7 @@ focusedMDS <- function(distances, ids = NULL, color_cat = NULL, focus_point = id
   if( is.null(ids))  {
 	  ids <- paste( rep("N", nrow(distances)), c(1:nrow(distances)), sep = "")
   } else {
+  
 	  if( nrow(distances) != length(ids)) {
 	  	stop( "Number of rows/columns in 'distances' does not match length of 'ids' vector.")
 	  }
@@ -176,10 +186,10 @@ focusedMDS <- function(distances, ids = NULL, color_cat = NULL, focus_point = id
   
   # If no colors specified, give rainbow colors.
   if( is.null(color_cat) ) {
-	  colors <- rainbow(nrow(distances), v = .70)
+	  colors <- rainbow(nrow(distances), v = .85)
 	  
 	  # If no colors vector given, set legend_data value to false
-	  legend_data = list( categories = rep("__nolegend__", 3), colors = rep("__nolegend__", 3))
+	  legend_data = list( categories = rep("__nolegend__", 3), colors = rep("__nolegend__", 3), categoryvector = rep("__nolegend__", 3))
 	  
 	  } else {
 		  # If colors specified, check that the number of colors matches the number of points.
@@ -187,29 +197,33 @@ focusedMDS <- function(distances, ids = NULL, color_cat = NULL, focus_point = id
 		  	stop( "Number of rows/columns in 'distances' does not match length of 'color_cat' vector.")
 	  	  }
 		  # Assign colors based on categories given in 'colors' vector
-		  categories <- unique(color_cat)
-		  colors <- color_cat # copying color_cat vector
+		  categories <- as.character(unique(color_cat))
+		  if( length(categories) > 25 ){
+			  stop( "'color_cat' vector must be discrete values, not continuous values. Please provide fewer categories.")
+		  }
+		  
+		  colors <- as.character(color_cat) # copying color_cat vector
 
 		  if(is.null(color_palette)){
 			  # Assign rainbow colors if none others given
-		  	  uniqueColors <- rainbow(length(unique(colors)), v = .70) 
+		  	  uniqueColors <- rainbow(length(unique(colors)), v = .85) 
 		  } else {
 			  # Use color_palette if given
 			  uniqueColors <- color_palette[1:length(unique(colors))]
 		  }
 		  
-		  for(i in seq_along(categories)){
-			  colors <- gsub(categories[i], uniqueColors[i], colors, fixed = T)
+		  for(i in 1:length(uniqueColors)){
+			  colors[colors == categories[i]]  <- uniqueColors[i]
 		  }
+		  
 		  # Convert uniqueColors to RBG
 		  uniqueColors <- toRGBvector(uniqueColors)
-		  
-		  legend_data <- list( categories = categories, colors = uniqueColors )	   
+		  legend_data <- list( categories = categories, colors = uniqueColors, categoryvector = as.character(color_cat) )	   
   }
   
   # Convert colors to rgb colors
-  colors <- toRGBvector(colors)
-    
+  colors <- toRGBvector(colors) 
+  
   # Check that that tolerance level is given as a number
   if( !is.numeric(tol)) {
 	  stop("'tol' must be numeric ")
@@ -222,13 +236,22 @@ focusedMDS <- function(distances, ids = NULL, color_cat = NULL, focus_point = id
 	  }
   }
   
+  # Check that 'title' is a character
+  if( !is.null(title)) {
+	  if( !is.character(title)) {
+		  stop("'title' must be a single character string")
+	  }
+  } else {
+	  title <- "__notitle__"
+  }
+  
   circles <- circles * 2 
   
   # create a list that contains the data to feed to JSON
   data = list(
     distances = distances, ids = ids, colors = colors, tol = tol, 
 	focus_point = focus_point, graph = graph, circles = circles,
-	subsampling = subsampling, legend_data = legend_data
+	subsampling = subsampling, legend_data = legend_data, title = title
   )
   
   # create widget
